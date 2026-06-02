@@ -1,0 +1,25 @@
+[project]
+name = "weather-enrichment-service-backend"
+version = "0.1.0"
+description = "FastAPI backend for Weather Enrichment Service"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg[binary]>=3.2.0",
+    "celery>=5.4.0",
+    "redis>=5.0.0",
+    "requests>=2.32.0",
+    "pydantic-settings>=2.4.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+    "httpx>=0.27.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

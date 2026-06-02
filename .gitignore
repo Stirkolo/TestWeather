@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+
+# Local env
+.env
+
+# Docker / OS
+.DS_Store
