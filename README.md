@@ -60,7 +60,6 @@ WES/
   start_wes.bat
   .env.example
   README.md
-  study.md
 ```
 
 ## Runtime architecture
