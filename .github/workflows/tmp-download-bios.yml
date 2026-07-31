@@ -1,0 +1,112 @@
+name: Temporary BIOS package download
+
+on:
+  push:
+    branches:
+      - tmp-bios-download-20260731
+
+permissions:
+  contents: read
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare output directory
+        run: mkdir -p out
+
+      - name: Resolve and download ASUS X515MA BIOS 307 (EZ Flash)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 4 --retry-all-errors \
+            'https://www.asus.com/support/api/product.asmx/GetPDBIOS?website=us&model=X515MA' \
+            --output asus-bios.json
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path('asus-bios.json').read_text(encoding='utf-8-sig'))
+          urls = []
+
+          def walk(value):
+              if isinstance(value, dict):
+                  for item in value.values():
+                      walk(item)
+              elif isinstance(value, list):
+                  for item in value:
+                      walk(item)
+              elif isinstance(value, str):
+                  lower = value.lower()
+                  if value.startswith(('http://', 'https://')) and ('307' in value) and ('.zip' in lower or '.exe' in lower):
+                      urls.append(value)
+
+          walk(data)
+          preferred = [u for u in urls if 'x515ma' in u.lower() and '.zip' in u.lower()]
+          if not preferred:
+              preferred = [u for u in urls if '.zip' in u.lower()]
+          if not preferred:
+              raise SystemExit(f'No BIOS 307 ZIP URL found. Candidate URLs: {urls}')
+          url = preferred[0]
+          Path('asus-url.txt').write_text(url, encoding='utf-8')
+          print(url)
+          PY
+
+          ASUS_URL="$(cat asus-url.txt)"
+          curl --fail --location --retry 4 --retry-all-errors "$ASUS_URL" \
+            --output out/ASUS_X515MA_BIOS_307_EZFlash.zip
+          echo 'D3BA30FCF76DA8C707260F1D0C3C16D624410B3DAF6F52F67BADD3761581AB67  out/ASUS_X515MA_BIOS_307_EZFlash.zip' | sha256sum --check --strict
+          cp asus-url.txt out/ASUS_OFFICIAL_DOWNLOAD_URL.txt
+
+      - name: Download HP BIOS F.70 SoftPaq
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 4 --retry-all-errors \
+            'https://ftp.hp.com/pub/softpaq/sp157501-158000/sp157924.exe' \
+            --output out/HP_15_BIOS_F70_sp157924.exe
+          echo '73462800E3F51DF1C8FCD8D9E74B5097  out/HP_15_BIOS_F70_sp157924.exe' | md5sum --check --strict
+          curl --fail --location --retry 4 --retry-all-errors \
+            'https://ftp.hp.com/pub/softpaq/sp157501-158000/sp157924.html' \
+            --output out/HP_sp157924_release_notes.html
+          curl --fail --location --retry 4 --retry-all-errors \
+            'https://ftp.hp.com/pub/softpaq/sp157501-158000/sp157924.cva' \
+            --output out/HP_sp157924_metadata.cva || true
+
+      - name: Write checksums and safety notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd out && sha256sum * > SHA256SUMS.txt)
+          cat > out/LEGGIMI_PRIMA.txt <<'EOF'
+          PACCHETTI BIOS SCARICATI DA SERVER UFFICIALI
+
+          ASUS X515MA
+          - Versione: 307
+          - Metodo consigliato: ASUS EZ Flash dal BIOS
+          - SHA-256 ufficiale del pacchetto ZIP:
+            D3BA30FCF76DA8C707260F1D0C3C16D624410B3DAF6F52F67BADD3761581AB67
+
+          HP 15s-fq3002sl / Product ID 8F216EA#ABZ
+          - Pacchetto candidato: HP SoftPaq sp157924, BIOS F.70
+          - MD5 ufficiale:
+            73462800E3F51DF1C8FCD8D9E74B5097
+          - ATTENZIONE: prima di eseguirlo verificare nel BIOS F10 che System Board ID e
+            versione corrente siano compatibili. Il pacchetto HP dichiara che, dopo questo
+            aggiornamento di sicurezza, non e possibile reinstallare versioni precedenti.
+
+          REGOLE MINIME
+          - Alimentatore collegato e batteria sufficientemente carica.
+          - Non spegnere, riavviare o scollegare il computer durante il flash.
+          - Non usare il file ASUS su modelli diversi da X515MA.
+          - Non avviare il file HP finche il System Board ID non e stato verificato.
+          EOF
+
+      - name: Upload verified BIOS packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: BIOS_updates_HP_15s-fq3002sl_ASUS_X515MA
+          path: out/
+          if-no-files-found: error
+          retention-days: 1
