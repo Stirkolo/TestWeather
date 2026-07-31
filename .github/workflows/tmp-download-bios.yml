@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - tmp-bios-download-20260731
+  pull_request:
+    branches:
+      - tmp-bios-download-20260731
 
 permissions:
   contents: read
